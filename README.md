@@ -78,6 +78,8 @@ openvitals/
 
 ## Self-Hosting Guide
 
+This repository contains the web platform. The Android app is maintained separately in [OpenVitals](https://github.com/lorenzomp7/OpenVitals). The workspace pins pnpm 9.15.4 and requires Node.js 20 or later.
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) >= 20
@@ -87,8 +89,8 @@ openvitals/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/zmeyer44/OpenVitals.git
-cd OpenVitals
+git clone https://github.com/lorenzomp7/OpenVitals.io.git
+cd OpenVitals.io
 ```
 
 ### 2. Install dependencies
