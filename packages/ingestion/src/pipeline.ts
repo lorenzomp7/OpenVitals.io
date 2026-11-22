@@ -1,7 +1,7 @@
 import type { ClassificationResult, ParseResult, NormalizationResult, PipelineResult } from './types';
 
 // The pipeline orchestrates classify -> parse -> normalize.
-// In production, each step runs as a Render Workflow step.
+// In production, the steps run inside the ingestion worker (services/ingestion-worker).
 // This module provides the logical composition for testing.
 
 export interface PipelineContext {

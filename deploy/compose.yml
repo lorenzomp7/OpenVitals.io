@@ -1,0 +1,90 @@
+# OpenVitals sulla VM Oracle: PostgreSQL 16, web app Next.js e worker di ingestione.
+# Caddy (deploy/bootstrap.sh) espone solo la web app in HTTPS ("openvitals-web" sulla rete "web");
+# database e worker restano sulla rete interna del progetto, non raggiungibili da Internet.
+x-common-env: &common-env
+  DATABASE_URL: postgresql://openvitals:${POSTGRES_PASSWORD}@db:5432/openvitals
+  BLOB_STORAGE_PROVIDER: ${BLOB_STORAGE_PROVIDER:-local}
+  BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN:-}
+  LOCAL_BLOB_DIR: /data/blobs
+  AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+  AI_DEFAULT_MODEL: ${AI_DEFAULT_MODEL:-claude-sonnet-4-20250514}
+  INGESTION_WEBHOOK_SECRET: ${INGESTION_WEBHOOK_SECRET:?manca il secret INGESTION_WEBHOOK_SECRET}
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: openvitals-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openvitals
+      POSTGRES_DB: openvitals
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?manca il secret POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openvitals -d openvitals"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  worker:
+    build:
+      context: ..
+      dockerfile: services/ingestion-worker/Dockerfile
+    container_name: openvitals-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      PORT: "4000"
+    volumes:
+      - blobs:/data/blobs
+    mem_limit: 1g
+    networks: [internal]
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${APP_URL:?manca APP_URL}
+    container_name: openvitals-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    environment:
+      <<: *common-env
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_URL: ${APP_URL}
+      BETTER_AUTH_URL: ${APP_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?manca il secret BETTER_AUTH_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?manca il secret ENCRYPTION_KEY}
+      INGESTION_WORKER_URL: http://worker:4000
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      WHOOP_CLIENT_ID: ${WHOOP_CLIENT_ID:-}
+      WHOOP_CLIENT_SECRET: ${WHOOP_CLIENT_SECRET:-}
+      WHOOP_WEBHOOK_SECRET: ${WHOOP_WEBHOOK_SECRET:-}
+      INTEGRATION_WEBHOOK_SECRET: ${INTEGRATION_WEBHOOK_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
+      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
+    volumes:
+      - blobs:/data/blobs
+    mem_limit: 2g
+    networks: [internal, web]
+
+volumes:
+  db-data:
+  blobs:
+
+networks:
+  internal:
+  web:
+    external: true
