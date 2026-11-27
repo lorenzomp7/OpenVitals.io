@@ -24,9 +24,10 @@ type WorkerTriggerParams = {
 };
 
 async function triggerWorker(db: Database, params: WorkerTriggerParams) {
-  const workerUrl = process.env.RENDER_WORKER_URL ?? "http://localhost:4000";
+  const workerUrl =
+    process.env.INGESTION_WORKER_URL ?? "http://localhost:4000";
   const webhookSecret =
-    process.env.RENDER_WEBHOOK_SECRET ?? "dev-secret-change-me";
+    process.env.INGESTION_WEBHOOK_SECRET ?? "dev-secret-change-me";
 
   try {
     const response = await fetch(`${workerUrl}/api/workflows/trigger`, {

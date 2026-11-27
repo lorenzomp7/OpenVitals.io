@@ -137,8 +137,8 @@ BLOB_STORAGE_PROVIDER=local
 ENCRYPTION_KEY=change-me-32-byte-key-here-pad00
 
 # Ingestion worker
-RENDER_WORKER_URL=http://localhost:4000
-RENDER_WEBHOOK_SECRET=dev-secret-change-me
+INGESTION_WORKER_URL=http://localhost:4000
+INGESTION_WEBHOOK_SECRET=dev-secret-change-me
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -210,14 +210,39 @@ pnpm test:e2e:ui      # Run Playwright tests with interactive UI
 
 ## Deployment
 
-The project includes a `render.yaml` for deploying the ingestion worker to [Render](https://render.com). The Next.js web app deploys to any platform that supports Node.js — [Vercel](https://vercel.com), Render, Railway, Fly.io, or a plain VPS.
+Everything runs on a single **Oracle Cloud Always Free** VM (shared with the owner's other projects, 0 €/month):
+PostgreSQL 16, the Next.js web app and the ingestion worker, each in Docker, behind Caddy with automatic HTTPS.
+Only the web app is reachable from the Internet; the database and the worker stay on the project's internal Docker
+network. The web app needs a Node.js server (auth, tRPC API), so it cannot be hosted on GitHub Pages.
 
-For production deployments:
+The `Deploy backend` workflow (`.github/workflows/deploy-backend.yml`) updates the VM on every push to `main`.
 
-1. Set `BLOB_STORAGE_PROVIDER=vercel` and configure `BLOB_READ_WRITE_TOKEN` for file uploads.
-2. Use a managed Postgres instance and set `DATABASE_URL`.
-3. Set strong values for `BETTER_AUTH_SECRET` and `ENCRYPTION_KEY`.
-4. Configure `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` to your production domain.
+1. Create the VM once by following [deploy/README.md](deploy/README.md) (Italian).
+2. In **Settings → Secrets and variables → Actions** add:
+
+   | Type | Name | Value |
+   |---|---|---|
+   | Variable | `VM_HOST` | public IP of the VM |
+   | Secret | `VM_SSH_KEY` | private SSH key of the VM |
+   | Secret | `POSTGRES_PASSWORD` | letters and digits only, e.g. `openssl rand -hex 24` |
+   | Secret | `BETTER_AUTH_SECRET` | e.g. `openssl rand -hex 32` |
+   | Secret | `ENCRYPTION_KEY` | **exactly 32 characters**, e.g. `openssl rand -hex 16` |
+   | Secret | `INGESTION_WEBHOOK_SECRET` | shared secret between web app and worker, e.g. `openssl rand -hex 24` |
+   | Secret | `AI_GATEWAY_API_KEY` | Vercel AI Gateway key used by the AI SDK |
+   | Variable | `AI_DEFAULT_MODEL` | optional, defaults to `claude-sonnet-4-20250514` |
+   | Variable | `API_HOST` | optional: your own domain (DNS `A` record to the VM) |
+
+   Optional secrets, passed through when set: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `WHOOP_CLIENT_ID`,
+   `WHOOP_CLIENT_SECRET`, `WHOOP_WEBHOOK_SECRET`, `INTEGRATION_WEBHOOK_SECRET`, `RESEND_API_KEY`,
+   `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `BLOB_READ_WRITE_TOKEN` (with the variable
+   `BLOB_STORAGE_PROVIDER=vercel`; by default uploads are stored in a Docker volume shared by web app and worker).
+
+3. Run **Actions → Deploy backend → Run workflow**. Migrations are applied when the web container starts.
+   The app answers on `https://openvitals.<IP with dashes>.sslip.io` (or `API_HOST`); use that URL as the
+   redirect/webhook base for Google OAuth and Whoop.
+
+Ingestion worker settings: `INGESTION_WORKER_URL` (web app → worker, `http://worker:4000` on the VM) and
+`INGESTION_WEBHOOK_SECRET` (bearer token checked by the worker).
 
 ## Contributing
 

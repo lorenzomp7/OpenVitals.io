@@ -2,7 +2,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { processWorkflow } from './workflow';
 
 const PORT = parseInt(process.env.PORT ?? '4000', 10);
-const WEBHOOK_SECRET = process.env.RENDER_WEBHOOK_SECRET ?? 'dev-secret-change-me';
+const WEBHOOK_SECRET = process.env.INGESTION_WEBHOOK_SECRET ?? 'dev-secret-change-me';
 
 function parseBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
